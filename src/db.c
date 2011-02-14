@@ -92,7 +92,7 @@ SEXP rberkeley_db_compact (SEXP _dbp, SEXP _txnid, SEXP _start,
   DB *dbp;
   DB_TXN *txnid;
   DBT start, stop, end;
-  DB_COMPACT c_data;
+  /*DB_COMPACT c_data;*/
   u_int32_t flags;
   int ret;
 
@@ -240,6 +240,54 @@ SEXP rberkeley_db_get(SEXP _dbp, SEXP _txnid, SEXP _key, SEXP _data, SEXP _flags
   } else return ScalarInteger(ret); 
 }
 /* }}} */
+/* {{{ rberkeley_db_getP */
+SEXP rberkeley_db_getP(SEXP _dbp, SEXP _txnid, SEXP _key, SEXP _data, SEXP _flags)
+{
+  DB *dbp;
+  DBT key, data;
+  DB_TXN *txnid;
+  u_int32_t flags = INTEGER(_flags)[0];
+  int ret;
+
+  memset(&key, 0, sizeof(key));
+  memset(&data, 0, sizeof(data));
+
+  key.data = (unsigned char *)RAW(_key);
+  key.size = length(_key);
+
+  if(!isNull(_data)) {
+    if(!isNull(VECTOR_ELT(_data,0)))
+      data.data = (unsigned char *)RAW(VECTOR_ELT(_data,0));
+    if(!isNull(VECTOR_ELT(_data,1)))
+      data.size = INTEGER(VECTOR_ELT(_data,1))[0];
+    if(!isNull(VECTOR_ELT(_data,2)))
+      data.ulen = INTEGER(VECTOR_ELT(_data,2))[0];
+    if(!isNull(VECTOR_ELT(_data,3)))
+      data.dlen = INTEGER(VECTOR_ELT(_data,3))[0];
+    if(!isNull(VECTOR_ELT(_data,4)))
+      data.doff = INTEGER(VECTOR_ELT(_data,4))[0];
+    if(!isNull(VECTOR_ELT(_data,5)))
+      data.flags = INTEGER(VECTOR_ELT(_data,5))[0];
+  }
+
+  dbp = R_ExternalPtrAddr(_dbp);
+  if(R_ExternalPtrTag(_dbp) != RBerkeley_DB || dbp == NULL)
+    error("invalid 'db' handle");
+
+  if(!isNull(_txnid)) {
+    txnid = R_ExternalPtrAddr(_txnid);
+  } else txnid = NULL;
+
+  ret = dbp->get(dbp, txnid, &key, &data, flags);
+  if(ret == 0) {
+    SEXP retdata;
+    PROTECT(retdata = allocVector(RAWSXP, data.size));
+    memcpy(RAW(retdata), data.data, data.size);
+    UNPROTECT(1);
+    return retdata;
+  } else return ScalarInteger(ret); 
+}
+/* }}} */
 /* {{{ rberkeley_db_get_byteswapped */
 SEXP rberkeley_db_get_byteswapped (SEXP _dbp)
 {
@@ -349,6 +397,12 @@ SEXP rberkeley_db_get_type (SEXP _dbp)
       break;
     case DB_QUEUE:
       return mkString("DB_QUEUE");
+      break;
+    case DB_UNKNOWN:
+      return mkString("DB_UNKNOWN");
+      break;
+    default:
+      return R_NilValue;
       break;
   }
 }
@@ -580,7 +634,6 @@ SEXP rberkeley_db_stat (SEXP _dbp, SEXP _txnid, SEXP _flags)
   DB_TXN *txnid;
   DBTYPE type;
   u_int32_t flags;
-  int ret;
 
   dbp = R_ExternalPtrAddr(_dbp);
   if(R_ExternalPtrTag(_dbp) != RBerkeley_DB || dbp == NULL)
@@ -705,6 +758,9 @@ SEXP rberkeley_db_stat (SEXP _dbp, SEXP _txnid, SEXP _flags)
       SET_STRING_ELT(DBstatnames,  10, mkChar("qs_first_recno"));
       SET_VECTOR_ELT(DBstat, 11, ScalarInteger(qs->qs_cur_recno));
       SET_STRING_ELT(DBstatnames,  11, mkChar("qs_cur_recno"));
+      break;
+    case DB_UNKNOWN:
+      error("DB_UNKNOWN"); /* FIXME not too sure of correct handling here */
       break;
   }
   setAttrib(DBstat, R_NamesSymbol, DBstatnames); 

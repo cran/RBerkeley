@@ -6,5 +6,5 @@
 #PKG_CFLAGS = -W $(DB_CFLAGS) 
 #PKG_LIBS   = $(DB_LIBS) 
 PKG_CPPFLAGS = 
-PKG_LIBS = -L/usr/local/lib64 -ldb
+PKG_LIBS = -L/usr/local/BerkeleyDB.5.1/lib -ldb
 
